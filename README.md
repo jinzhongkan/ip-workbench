@@ -6,6 +6,11 @@
 
 ```
 ip-workbench/
+├── me/                   # 记忆与认知区（模型无关）：任何大模型读这里即可恢复对用户的完整认知
+│   ├── README.md        # AI 接入说明与维护规则
+│   ├── PROFILE.md       # 一页核心档案（30 秒版）
+│   ├── CONTEXT.md       # 完整认知：指令/身份/职业/项目/偏好 五分类，条目带日期
+│   └── UPDATE-LOG.md    # 认知变更日志
 ├── profile/              # 我是谁：用户档案 + 平台发布规范（写内容前必读）
 │   ├── USER-PROFILE.md   # IP 定位、受众锚点、栏目矩阵、红线清单
 │   └── PLATFORM-RULES.md # 视频号 / 小红书 两个平台的发布规范与适配要点
@@ -49,3 +54,4 @@ git clone https://github.com/jinzhongkan/ip-workbench.git
 
 - 仓库为唯一事实来源：发布过的内容必须归档到 `published/`，否则跨设备后状态不一致。
 - 写任何内容前先读 `profile/USER-PROFILE.md`，红线清单不许越。
+- `me/` 是用户认知的单一事实来源：对话中获得新的用户认知时，更新 `me/` 并在 `UPDATE-LOG.md` 记录。
