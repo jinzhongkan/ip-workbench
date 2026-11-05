@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>IP 工作台 · 云端</title>
+<style>
+  :root { --bg:#f7f8fa; --card:#fff; --ink:#1f2329; --sub:#646a73; --line:#e5e7eb;
+          --pri:#2563eb; --pri-bg:#eff6ff; --ok:#16a34a; --err:#dc2626; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; font-size:15px; }
+  .wrap { max-width:860px; margin:0 auto; padding:20px 16px 130px; }
+  header h1 { font-size:20px; margin:0 0 2px; }
+  header p { color:var(--sub); font-size:12px; margin:0 0 14px; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; position:sticky; top:0; background:var(--bg); padding:8px 0; z-index:5; }
+  .tab { flex:1; text-align:center; padding:9px 0; border-radius:10px; background:#fff;
+         border:1px solid var(--line); font-size:14px; cursor:pointer; color:var(--sub); }
+  .tab.on { background:var(--pri); border-color:var(--pri); color:#fff; font-weight:600; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 4px; }
+  .card .hint { font-size:12px; color:var(--sub); margin:0 0 10px; }
+  textarea { width:100%; min-height:64px; border:1px solid var(--line); border-radius:8px;
+             padding:10px 12px; font-size:14px; font-family:inherit; resize:vertical; }
+  textarea.big { min-height:46vh; font-family:ui-monospace,Consolas,monospace; font-size:13px; line-height:1.6; }
+  input[type=text], input[type=password] { border:1px solid var(--line); border-radius:8px; padding:9px 11px;
+             font-size:14px; font-family:inherit; width:100%; }
+  .row { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .row input { flex:1; }
+  .w-row { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .w-row label { width:100px; font-size:14px; }
+  .w-row input { width:64px; text-align:center; border:1px solid var(--line);
+                 border-radius:8px; padding:6px; font-size:14px; }
+  .w-row .bar { flex:1; height:8px; background:#eef1f5; border-radius:4px; overflow:hidden; }
+  .w-row .bar i { display:block; height:100%; background:var(--pri); }
+  #sum { font-size:12px; color:var(--sub); }
+  #sum.bad { color:var(--err); font-weight:600; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-size:13px;
+          cursor:pointer; background:#fff; color:var(--sub); user-select:none; }
+  .chip.on { background:var(--pri-bg); border-color:var(--pri); color:var(--pri); font-weight:600; }
+  .addrow { display:flex; gap:8px; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:var(--sub); font-weight:500; padding:6px 8px;
+       border-bottom:1px solid var(--line); font-size:12px; }
+  td { padding:6px 4px; border-bottom:1px solid #f0f1f4; }
+  td input { border:1px solid transparent; border-radius:6px; padding:6px 7px; width:100%;
+             font-size:13px; background:transparent; }
+  td input:focus { border-color:var(--line); background:#fff; outline:none; }
+  .del { color:#b0b5bd; cursor:pointer; border:none; background:none; font-size:16px; padding:4px 6px; }
+  .del:hover { color:var(--err); }
+  .btn { border:none; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer;
+         background:var(--pri); color:#fff; }
+  .btn.sec { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .btn:disabled { opacity:.5; }
+  .btn.sm { padding:6px 12px; font-size:13px; }
+  .radio-row label { display:block; padding:10px; border:1px solid var(--line);
+                     border-radius:8px; margin:6px 0; font-size:13px; cursor:pointer; }
+  .radio-row input { margin-right:8px; }
+  .radio-row .desc { color:var(--sub); font-size:12px; margin-left:22px; display:block; }
+  .file-item { display:flex; align-items:center; gap:8px; padding:11px 12px; border:1px solid var(--line);
+               border-radius:10px; margin-bottom:8px; background:#fff; cursor:pointer; font-size:14px; }
+  .file-item:active { background:var(--pri-bg); }
+  .file-item .meta { margin-left:auto; color:var(--sub); font-size:12px; }
+  .crumb { font-size:13px; color:var(--sub); margin-bottom:10px; word-break:break-all; }
+  .crumb a { color:var(--pri); cursor:pointer; text-decoration:none; margin-right:4px; }
+  #bar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); padding:10px 0; }
+  #bar .wrap { padding:0 16px; display:flex; align-items:center; gap:10px; }
+  #status { font-size:12px; color:var(--sub); white-space:pre-wrap; flex:1; line-height:1.4; }
+  #status.ok { color:var(--ok); } #status.err { color:var(--err); }
+  .hidden { display:none !important; }
+  .login-box { max-width:420px; margin:12vh auto 0; }
+  .login-box .card { padding:24px; }
+  code.k { background:#eef1f5; border-radius:4px; padding:1px 5px; font-size:12px; }
+  ol.steps { padding-left:18px; font-size:13px; color:var(--sub); line-height:1.9; }
+  .pre { white-space:pre-wrap; font-family:ui-monospace,Consolas,monospace; font-size:13px; line-height:1.65; }
+</style>
+</head>
+<body>
+
+<!-- 令牌设置页 -->
+<div class="wrap login-box" id="loginView">
+  <header><h1>IP 工作台 · 云端</h1><p>数据在您的 GitHub 私有仓库，此页面只是操作界面。</p></header>
+  <div class="card">
+    <h2>第一次使用：填入访问令牌</h2>
+    <ol class="steps">
+      <li>电脑浏览器打开 <code class="k">github.com</code> → 右上角头像 → <b>Settings</b></li>
+      <li>左侧最底部 <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → <b>Generate new token</b></li>
+      <li>Repository access 选 <b>Only select repositories</b> → 只勾 <code class="k">jinzhongkan/ip-workbench</b></li>
+      <li>Permissions → Repository permissions → <b>Contents</b> 设为 <b>Read and write</b>（只改这一项即可）</li>
+      <li>生成后复制令牌（ghp_ 或 github_pat_ 开头），粘贴到下面：</li>
+    </ol>
+    <div class="row"><input type="password" id="tokenInput" placeholder="粘贴 GitHub 令牌"></div>
+    <div class="row"><button type="button" class="btn" id="tokenSave">验证并进入</button></div>
+    <p class="hint" style="margin-top:10px">令牌只存在本设备浏览器里（localStorage），不会上传到任何服务器。</p>
+    <p class="hint" id="tokenErr" style="color:var(--err)"></p>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div class="wrap hidden" id="mainView">
+  <header><h1>IP 工作台 · 云端</h1><p>jinzhongkan/ip-workbench ｜ 保存即提交到 GitHub</p></header>
+  <div class="tabs">
+    <div class="tab on" data-tab="radar">⚡ 雷达配置</div>
+    <div class="tab" data-tab="reports">📰 日报</div>
+    <div class="tab" data-tab="files">📁 文件</div>
+  </div>
+
+  <!-- 雷达配置 -->
+  <div id="tab-radar">
+    <div class="card">
+      <h2>今日内容方向</h2>
+      <p class="hint">雷达选题建议将优先贴合这里。</p>
+      <textarea id="focusNote" placeholder="例：本周主打费率账+36条红线"></textarea>
+      <div id="topicList"></div>
+      <div class="addrow">
+        <input type="text" id="newTopic" placeholder="加一个优先选题方向">
+        <button type="button" class="btn sec" data-add="topic">添加</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>内容方向权重（栏目配比）</h2>
+      <div id="weights"></div>
+      <div id="sum"></div>
+    </div>
+    <div class="card">
+      <h2>重点关注标签</h2>
+      <div class="chips" id="chips"></div>
+      <div class="addrow">
+        <input type="text" id="newTag" placeholder="自定义标签">
+        <button type="button" class="btn sec" data-add="tag">添加标签</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>政策官网（每日必扫）</h2>
+      <table id="govTable"><thead><tr><th style="width:24%">名称</th><th style="width:32%">URL</th><th>关注点</th><th style="width:26px"></th></tr></thead><tbody></tbody></table>
+      <div class="addrow"><button type="button" class="btn sec" data-add="gov">＋ 加一行</button></div>
+    </div>
+    <div class="card">
+      <h2>公众号清单</h2>
+      <table id="wxTable"><thead><tr><th style="width:26%">公众号</th><th style="width:22%">类型</th><th>关注理由</th><th style="width:26px"></th></tr></thead><tbody></tbody></table>
+      <div class="addrow"><button type="button" class="btn sec" data-add="wx">＋ 加一行</button></div>
+    </div>
+    <div class="card">
+      <h2>检索关键词组</h2>
+      <div id="kwList"></div>
+      <div class="addrow">
+        <input type="text" id="newKw" placeholder="新检索词">
+        <button type="button" class="btn sec" data-add="kw">添加</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>筛选灵敏度</h2>
+      <div class="radio-row" id="sens">
+        <label><input type="radio" name="sens" value="strict">严格<span class="desc">只收与新就业形态/灵活用工/门店用工直接相关的内容</span></label>
+        <label><input type="radio" name="sens" value="normal">标准<span class="desc">严格 + 连锁业态用工动态</span></label>
+        <label><input type="radio" name="sens" value="loose">宽松<span class="desc">标准 + 一般 HR 干货也参考</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日报 -->
+  <div id="tab-reports" class="hidden">
+    <div class="card">
+      <h2>雷达日报</h2>
+      <p class="hint">每天 07:30 自动生成；点击阅读全文（可编辑）。</p>
+      <div id="reportList"><p class="hint">载入中…</p></div>
+    </div>
+  </div>
+
+  <!-- 文件浏览/编辑 -->
+  <div id="tab-files" class="hidden">
+    <div class="card">
+      <h2>仓库文件</h2>
+      <div class="crumb" id="crumb"></div>
+      <div id="fileList"></div>
+    </div>
+    <div class="card hidden" id="editorCard">
+      <h2 id="editorTitle">编辑</h2>
+      <textarea class="big" id="editorArea"></textarea>
+      <div class="addrow">
+        <button type="button" class="btn sec" id="editorClose">返回列表</button>
+        <button type="button" class="btn" id="editorSave">保存到 GitHub</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>快捷入口</h2>
+      <div id="quickLinks"></div>
+    </div>
+  </div>
+</div>
+
+<div id="bar" class="hidden"><div class="wrap">
+  <span id="status">就绪</span>
+  <button type="button" class="btn sec" data-act="reload">放弃修改</button>
+  <button type="button" class="btn" id="saveBtn" data-act="save">保存到 GitHub</button>
+</div></div>
+
+<script>
+/* ============ GitHub API（纯前端，令牌存本机浏览器） ============ */
+const OWNER='jinzhongkan', REPO='ip-workbench', BRANCH='main';
+const API=`https://api.github.com/repos/${OWNER}/${REPO}`;
+let TOKEN = localStorage.getItem('gh_token')||'';
+
+async function gh(path, opts={}){
+  const headers={'Authorization':'Bearer '+TOKEN,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  if(opts.body) headers['Content-Type']='application/json';
+  const r=await fetch(API+path,{...opts,headers});
+  if(r.status===401){ localStorage.removeItem('gh_token'); throw new Error('令牌无效或已过期，请重新填入'); }
+  if(!r.ok) throw new Error('GitHub API '+r.status+'：'+(await r.text()).slice(0,160));
+  return r;
+}
+function b64dec(s){ const bin=atob(s.replace(/\n/g,'')); const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); return new TextDecoder('utf-8').decode(bytes); }
+function b64enc(s){ const bytes=new TextEncoder().encode(s); let bin='';
+  const CH=0x8000; for(let i=0;i<bytes.length;i+=CH) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(bin); }
+async function getFile(path){
+  const r=await gh('/contents/'+encodeURI(path)+'?ref='+BRANCH+'&t='+Date.now());
+  const j=await r.json(); return {content:b64dec(j.content), sha:j.sha};
+}
+async function putFile(path, content, sha, msg){
+  const body={message:msg, branch:BRANCH, content:b64enc(content)}; if(sha) body.sha=sha;
+  const r=await gh('/contents/'+encodeURI(path),{method:'PUT',body:JSON.stringify(body)});
+  return (await r.json()).content.sha;
+}
+async function listDir(path){
+  const r=await gh('/contents/'+(path?encodeURI(path):'')+'?ref='+BRANCH);
+  return await r.json();
+}
+
+/* ============ 通用 ============ */
+const $=id=>document.getElementById(id);
+function setStatus(msg,cls){ const s=$('status'); s.textContent=msg; s.className=cls||''; }
+function showBar(on){ $('bar').classList.toggle('hidden',!on); }
+let CFG=null, CFG_SHA=null, editing=null; // editing={path,sha}
+
+/* ============ 登录 ============ */
+$('tokenSave').onclick=async()=>{
+  const t=$('tokenInput').value.trim(); $('tokenErr').textContent='';
+  if(!t){ $('tokenErr').textContent='请粘贴令牌'; return; }
+  TOKEN=t;
+  $('tokenSave').disabled=true; $('tokenSave').textContent='验证中…';
+  try{ await listDir(''); localStorage.setItem('gh_token',t); enterMain(); }
+  catch(e){ $('tokenErr').textContent=e.message; TOKEN=''; }
+  $('tokenSave').disabled=false; $('tokenSave').textContent='验证并进入';
+};
+
+/* ============ 主界面 ============ */
+function enterMain(){
+  $('loginView').classList.add('hidden'); $('mainView').classList.remove('hidden'); showBar(true);
+  loadRadar(); loadReports(); loadDir('');
+}
+async function loadRadar(){
+  try{
+    const f=await getFile('radar/radar-config.json'); CFG=JSON.parse(f.content); CFG_SHA=f.sha;
+    $('focusNote').value=CFG.daily_focus.note||'';
+    renderTopics(); renderWeights(); renderChips(); renderGov(); renderWx(); renderKw();
+    const sens=document.querySelector(`#sens input[value="${CFG.scan.sensitivity}"]`); if(sens) sens.checked=true;
+    setStatus('配置已载入（最后更新 '+CFG.updated+'）');
+  }catch(e){ setStatus('配置载入失败：'+e.message,'err'); }
+}
+
+const ALL_TAGS=["费率账","政策红线","C端自由","判例拆解","招聘成本","业态案例","职伤保障","代扣新政","多雇主生态","系统留痕","门店排班","社保新规","AI用工"];
+
+function renderTopics(){ const box=$('topicList'); box.innerHTML='';
+  (CFG.daily_focus.priority_topics||[]).forEach((t,i)=>{
+    const d=document.createElement('div'); d.className='row';
+    const inp=document.createElement('input'); inp.type='text'; inp.value=t; inp.dataset.list='topics'; inp.dataset.idx=i;
+    const del=document.createElement('button'); del.type='button'; del.className='del'; del.textContent='✕'; del.dataset.del='topics'; del.dataset.idx=i;
+    d.appendChild(inp); d.appendChild(del); box.appendChild(d); }); }
+function renderWeights(){ const box=$('weights'); box.innerHTML='';
+  for(const k in CFG.direction_weights){
+    const d=document.createElement('div'); d.className='w-row';
+    const lab=document.createElement('label'); lab.textContent=k;
+    const inp=document.createElement('input'); inp.type='text'; inp.value=CFG.direction_weights[k]; inp.dataset.weight=k;
+    const bar=document.createElement('div'); bar.className='bar';
+    const fill=document.createElement('i'); fill.style.width=Math.min(CFG.direction_weights[k],100)+'%'; bar.appendChild(fill);
+    const pct=document.createElement('span'); pct.textContent=CFG.direction_weights[k]+'%';
+    d.appendChild(lab); d.appendChild(inp); d.appendChild(bar); d.appendChild(pct); box.appendChild(d); }
+  updateBars(); }
+function updateBars(){ let sum=0;
+  document.querySelectorAll('#weights .w-row').forEach(row=>{
+    const v=parseInt(row.querySelector('input').value)||0; sum+=v;
+    row.querySelector('.bar i').style.width=Math.min(v,100)+'%';
+    row.querySelector('span:last-child').textContent=v+'%'; });
+  const el=$('sum'); el.textContent='合计 '+sum+'%'+(sum!==100?'（建议凑整 100%）':'');
+  el.className=sum===100?'':'bad'; }
+function renderChips(){ const box=$('chips'); box.innerHTML='';
+  [...new Set([...ALL_TAGS,...CFG.focus_tags])].forEach(t=>{
+    const c=document.createElement('span'); c.className='chip'+(CFG.focus_tags.includes(t)?' on':''); c.textContent=t; c.dataset.tag=t; box.appendChild(c); }); }
+function renderTable(tableId,rows,fields){
+  const tb=document.querySelector(tableId+' tbody'); tb.innerHTML='';
+  rows.forEach((r,i)=>{ const tr=document.createElement('tr');
+    fields.forEach(f=>{ const td=document.createElement('td');
+      const inp=document.createElement('input'); inp.value=r[f]||''; inp.dataset.field=f; inp.dataset.idx=i; inp.dataset.table=tableId;
+      td.appendChild(inp); tr.appendChild(td); });
+    const td=document.createElement('td');
+    const del=document.createElement('button'); del.type='button'; del.className='del'; del.textContent='✕'; del.dataset.delRow=tableId; del.dataset.idx=i;
+    td.appendChild(del); tr.appendChild(td); tb.appendChild(tr); }); }
+function renderGov(){ renderTable('#govTable',CFG.gov_sites,['name','url','note']); }
+function renderWx(){ renderTable('#wxTable',CFG.weixin_accounts,['name','type','reason']); }
+function renderKw(){ const box=$('kwList'); box.innerHTML='';
+  CFG.search_keywords.forEach((k,i)=>{ const d=document.createElement('div'); d.className='row';
+    const inp=document.createElement('input'); inp.type='text'; inp.value=k; inp.dataset.list='kw'; inp.dataset.idx=i;
+    const del=document.createElement('button'); del.type='button'; del.className='del'; del.textContent='✕'; del.dataset.del='kw'; del.dataset.idx=i;
+    d.appendChild(inp); d.appendChild(del); box.appendChild(d); }); }
+
+document.addEventListener('input',e=>{ const t=e.target;
+  if(t.dataset.weight!==undefined){ updateBars(); return; }
+  if(t.dataset.field){ (t.dataset.table==='#govTable'?CFG.gov_sites:CFG.weixin_accounts)[+t.dataset.idx][t.dataset.field]=t.value; }
+  else if(t.dataset.list==='topics'){ CFG.daily_focus.priority_topics[+t.dataset.idx]=t.value; }
+  else if(t.dataset.list==='kw'){ CFG.search_keywords[+t.dataset.idx]=t.value; }
+});
+document.addEventListener('click',e=>{
+  const chip=e.target.closest('.chip');
+  if(chip){ const t=chip.dataset.tag,i=CFG.focus_tags.indexOf(t);
+    i>=0?CFG.focus_tags.splice(i,1):CFG.focus_tags.push(t); renderChips(); return; }
+  const del=e.target.closest('button[data-del]');
+  if(del){ if(del.dataset.del==='topics') CFG.daily_focus.priority_topics.splice(+del.dataset.idx,1);
+    if(del.dataset.del==='kw') CFG.search_keywords.splice(+del.dataset.idx,1);
+    del.dataset.del==='topics'?renderTopics():renderKw(); return; }
+  const delRow=e.target.closest('button[data-delRow]');
+  if(delRow){ if(delRow.dataset.delRow==='#govTable') CFG.gov_sites.splice(+delRow.dataset.idx,1);
+    else CFG.weixin_accounts.splice(+delRow.dataset.idx,1);
+    delRow.dataset.delRow==='#govTable'?renderGov():renderWx(); return; }
+  const add=e.target.closest('button[data-add]');
+  if(add){ const k=add.dataset.add;
+    if(k==='gov'){ CFG.gov_sites.push({name:'',url:'',note:''}); renderGov(); }
+    else if(k==='wx'){ CFG.weixin_accounts.push({name:'',type:'',reason:''}); renderWx(); }
+    else if(k==='topic'){ const v=$('newTopic').value.trim(); if(!v)return; CFG.daily_focus.priority_topics.push(v); $('newTopic').value=''; renderTopics(); }
+    else if(k==='tag'){ const v=$('newTag').value.trim(); if(!v)return; if(!CFG.focus_tags.includes(v))CFG.focus_tags.push(v); $('newTag').value=''; renderChips(); }
+    else if(k==='kw'){ const v=$('newKw').value.trim(); if(!v)return; CFG.search_keywords.push(v); $('newKw').value=''; renderKw(); }
+    return; }
+  const act=e.target.closest('button[data-act]');
+  if(act){ if(act.dataset.act==='reload'){ loadRadar(); return; } if(act.dataset.act==='save'){ saveRadar(); return; } }
+  const tab=e.target.closest('.tab');
+  if(tab){ switchTab(tab.dataset.tab); return; }
+  const fi=e.target.closest('.file-item');
+  if(fi){ if(fi.dataset.dir!==undefined){ loadDir(fi.dataset.dir); } else { openFile(fi.dataset.file); } return; }
+  const cb=e.target.closest('#crumb a'); if(cb){ loadDir(cb.dataset.dir); return; }
+});
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
+  ['radar','reports','files'].forEach(n=>$('tab-'+n).classList.toggle('hidden',n!==name));
+  showBar(name==='radar');
+}
+
+/* ============ sources.md 生成（与本地工具同格式） ============ */
+function renderSourcesMd(cfg){
+  const gov=cfg.gov_sites.map(s=>`| ${s.name} | ${s.url} | ${s.note} |`).join('\n');
+  const wx=cfg.weixin_accounts.map(a=>`| ${a.name} | ${a.type} | ${a.reason} |`).join('\n');
+  const kw=cfg.search_keywords.map((k,i)=>`${i+1}. \`${k}\``).join('\n');
+  const tags=cfg.focus_tags.join('、');
+  const weights=Object.entries(cfg.direction_weights).map(([k,v])=>`${k} ${v}%`).join(' / ');
+  const focus=(cfg.daily_focus.note||'').trim()||'（未设置）';
+  const topics=(cfg.daily_focus.priority_topics||[]).map(t=>`- ${t}`).join('\n')||'- （无）';
+  return `# 内容雷达信源清单（由 radar-config.json 生成，请勿手改）
+
+> 更新时间：${cfg.updated} ｜ 唯一配置事实来源：\`radar/radar-config.json\`
+
+## 今日内容方向（雷达优先匹配）
+
+- **今日焦点**：${focus}
+- **优先选题方向**：
+${topics}
+- **栏目配比**：${weights}
+- **重点关注标签**：${tags}
+- **筛选灵敏度**：${cfg.scan.sensitivity}（${cfg.scan.sensitivity_desc}）
+
+## 一、政策官网（必扫）
+
+| 信源 | URL | 关注点 |
+|---|---|---|
+${gov}
+
+## 二、公众号（检索方式覆盖，查询词必须含"公众号"）
+
+| 公众号 | 类型 | 关注理由 |
+|---|---|---|
+${wx}
+
+## 三、检索关键词组（每日固定查询）
+
+${kw}
+
+## 筛选标准（命中什么才进日报）
+
+- 与**新就业形态/灵活用工/门店用工**监管直接相关的新文件、新判例、新数据 → 必进
+- 连锁业态的用工痛点事件（闭店、被仲裁、被罚）→ 必进
+- 一般性 HR 干货（与零工/连锁无关）→ 不进（loose 模式除外）
+- 每条记录：来源 / 日期 / 一句话事实 / 与 IP 定位的关联 / 可否转化为选题（哪个栏目）
+- 日报"本周可写选题"必须优先贴合上方"今日内容方向"
+`;
+}
+
+function harvest(){
+  CFG.daily_focus.note=$('focusNote').value;
+  const s=document.querySelector('#sens input:checked'); if(s) CFG.scan.sensitivity=s.value;
+  const readTbl=sel=>{ const arr=[]; document.querySelectorAll(sel+' tbody tr').forEach(tr=>{
+    const r={}; tr.querySelectorAll('input[data-field]').forEach(i=>r[i.dataset.field]=i.value); arr.push(r); });
+    return arr.filter(r=>r.name&&r.name.trim()); };
+  CFG.gov_sites=readTbl('#govTable'); CFG.weixin_accounts=readTbl('#wxTable');
+  CFG.daily_focus.priority_topics=[...document.querySelectorAll('#topicList input')].map(i=>i.value).filter(v=>v.trim());
+  CFG.search_keywords=[...document.querySelectorAll('#kwList input')].map(i=>i.value).filter(v=>v.trim());
+  const w={}; document.querySelectorAll('#weights .w-row input').forEach(i=>w[i.dataset.weight]=parseInt(i.value)||0);
+  CFG.direction_weights=w;
+}
+
+async function saveRadar(){
+  const btn=$('saveBtn'); btn.disabled=true; setStatus('正在保存到 GitHub…');
+  harvest(); CFG.updated=new Date().toISOString().slice(0,10);
+  try{
+    CFG_SHA=await putFile('radar/radar-config.json', JSON.stringify(CFG,null,2), CFG_SHA,
+      '更新内容雷达配置（云端，'+CFG.updated+'）');
+    const sf=await getFile('radar/sources.md');
+    await putFile('radar/sources.md', renderSourcesMd(CFG), sf.sha, '同步 sources.md 视图');
+    setStatus('✔ 已保存并提交到 GitHub；明早 07:30 雷达按新方向扫描','ok');
+    renderGov(); renderWx(); renderTopics(); renderKw();
+  }catch(e){ setStatus('保存失败：'+e.message,'err'); }
+  btn.disabled=false;
+}
+
+/* ============ 日报 ============ */
+async function loadReports(){
+  try{
+    const items=await listDir('radar/reports');
+    const files=items.filter(i=>i.name.endsWith('.md')&&i.name!=='README.md').sort((a,b)=>b.name.localeCompare(a.name));
+    const box=$('reportList'); box.innerHTML='';
+    if(!files.length){ box.innerHTML='<p class="hint">还没有日报。</p>'; return; }
+    files.forEach(f=>{
+      const d=document.createElement('div'); d.className='file-item';
+      d.innerHTML='📰 '+f.name; d.dataset.file='radar/reports/'+f.name; box.appendChild(d); });
+  }catch(e){ $('reportList').innerHTML='<p class="hint">载入失败：'+e.message+'</p>'; }
+}
+
+/* ============ 文件浏览/编辑 ============ */
+const QUICK=[['content/topics.md','🎯 选题库'],['ops/calendar.md','📅 发布日历'],['content/素材口袋.md','🧰 素材口袋'],['profile/USER-PROFILE.md','🪪 人设档案']];
+(function(){ const q=$('quickLinks');
+  QUICK.forEach(([p,label])=>{ const d=document.createElement('div'); d.className='file-item';
+    d.innerHTML=label+'<span class="meta">'+p+'</span>'; d.dataset.file=p; q.appendChild(d); }); })();
+
+async function loadDir(path){
+  $('editorCard').classList.add('hidden');
+  const crumb=$('crumb');
+  const parts=path?path.split('/'):[];
+  crumb.innerHTML='<a data-dir="">🏠 根目录</a>'+parts.map((p,i)=>' / <a data-dir="'+parts.slice(0,i+1).join('/')+'">'+p+'</a>').join('');
+  try{
+    const items=await listDir(path);
+    const box=$('fileList'); box.innerHTML='';
+    items.sort((a,b)=>(b.type==='dir')-(a.type==='dir')||a.name.localeCompare(b.name));
+    items.forEach(f=>{
+      if(f.name==='.git'||f.name==='_ui_check.js') return;
+      const d=document.createElement('div'); d.className='file-item';
+      if(f.type==='dir'){ d.innerHTML='📁 '+f.name; d.dataset.dir=path?path+'/'+f.name:f.name; }
+      else { d.innerHTML='📄 '+f.name+'<span class="meta">'+(f.size/1024).toFixed(1)+'K</span>'; d.dataset.file=path?path+'/'+f.name:f.name; }
+      box.appendChild(d); });
+  }catch(e){ $('fileList').innerHTML='<p class="hint">载入失败：'+e.message+'</p>'; }
+}
+
+async function openFile(path){
+  $('editorCard').classList.remove('hidden'); $('editorTitle').textContent='编辑：'+path;
+  $('editorArea').value='载入中…'; $('editorCard').scrollIntoView({behavior:'smooth'});
+  try{ const f=await getFile(path); editing={path,sha:f.sha}; $('editorArea').value=f.content; }
+  catch(e){ $('editorArea').value=''; alert('载入失败：'+e.message); }
+}
+$('editorClose').onclick=()=>{ editing=null; $('editorCard').classList.add('hidden'); };
+$('editorSave').onclick=async()=>{
+  if(!editing) return;
+  const btn=$('editorSave'); btn.disabled=true; btn.textContent='保存中…';
+  try{
+    const sha=await putFile(editing.path, $('editorArea').value, editing.sha, '更新 '+editing.path+'（云端）');
+    editing.sha=sha; btn.textContent='✔ 已保存';
+    setTimeout(()=>{ btn.textContent='保存到 GitHub'; },1500);
+  }catch(e){ alert('保存失败：'+e.message); btn.textContent='保存到 GitHub'; }
+  btn.disabled=false;
+};
+
+/* 启动 */
+if(TOKEN){ TOKEN=localStorage.getItem('gh_token');
+  (async()=>{ try{ await listDir(''); enterMain(); }catch(e){ TOKEN=''; $('loginView').classList.remove('hidden'); } })();
+}
+</script>
+</body>
+</html>
