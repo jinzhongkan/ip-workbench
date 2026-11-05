@@ -6,6 +6,7 @@
 打开：http://127.0.0.1:8788
 
 保存时：写入 radar/radar-config.json + 重新生成 radar/sources.md，并 git 提交推送到 GitHub。
+POST /api/save 若携带 "push": false 则只写本地文件不推送（测试用）。
 """
 import json
 import os
@@ -148,6 +149,8 @@ HTML = r"""<!DOCTYPE html>
              padding:10px 12px; font-size:14px; font-family:inherit; resize:vertical; }
   input[type=text] { border:1px solid var(--line); border-radius:8px; padding:8px 10px;
              font-size:13px; font-family:inherit; width:100%; }
+  .row { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .row input { flex:1; }
   .w-row { display:flex; align-items:center; gap:12px; margin:8px 0; }
   .w-row label { width:110px; font-size:14px; }
   .w-row input { width:70px; text-align:center; border:1px solid var(--line);
@@ -199,7 +202,7 @@ HTML = r"""<!DOCTYPE html>
     <div id="topicList"></div>
     <div class="addrow">
       <input type="text" id="newTopic" placeholder="加一个优先选题方向，如：职伤保障落地后的门店案例">
-      <button class="btn sec" onclick="addTopic()">添加</button>
+      <button type="button" class="btn sec" data-add="topic">添加</button>
     </div>
   </div>
 
@@ -216,20 +219,20 @@ HTML = r"""<!DOCTYPE html>
     <div class="chips" id="chips"></div>
     <div class="addrow">
       <input type="text" id="newTag" placeholder="自定义标签，如：AI用工">
-      <button class="btn sec" onclick="addTag()">添加标签</button>
+      <button type="button" class="btn sec" data-add="tag">添加标签</button>
     </div>
   </div>
 
   <div class="card">
     <h2>政策官网（每日必扫）</h2>
     <table id="govTable"><thead><tr><th style="width:22%">名称</th><th style="width:34%">URL</th><th>关注点</th><th style="width:30px"></th></tr></thead><tbody></tbody></table>
-    <div class="addrow"><button class="btn sec" onclick="addRow('gov')">＋ 加一行</button></div>
+    <div class="addrow"><button type="button" class="btn sec" data-add="gov">＋ 加一行</button></div>
   </div>
 
   <div class="card">
     <h2>公众号清单</h2>
     <table id="wxTable"><thead><tr><th style="width:24%">公众号</th><th style="width:20%">类型</th><th>关注理由</th><th style="width:30px"></th></tr></thead><tbody></tbody></table>
-    <div class="addrow"><button class="btn sec" onclick="addRow('wx')">＋ 加一行</button></div>
+    <div class="addrow"><button type="button" class="btn sec" data-add="wx">＋ 加一行</button></div>
   </div>
 
   <div class="card">
@@ -238,7 +241,7 @@ HTML = r"""<!DOCTYPE html>
     <div id="kwList"></div>
     <div class="addrow">
       <input type="text" id="newKw" placeholder="新检索词，如：灵活用工 社保 新规">
-      <button class="btn sec" onclick="addKw()">添加</button>
+      <button type="button" class="btn sec" data-add="kw">添加</button>
     </div>
   </div>
 
@@ -254,8 +257,8 @@ HTML = r"""<!DOCTYPE html>
 
 <div id="bar"><div class="wrap">
   <span id="status">就绪</span>
-  <button class="btn sec" onclick="location.reload()">放弃修改</button>
-  <button class="btn" id="saveBtn" onclick="save()">保存并同步到 GitHub</button>
+  <button type="button" class="btn sec" data-act="reload">放弃修改</button>
+  <button type="button" class="btn" id="saveBtn" data-act="save">保存并同步到 GitHub</button>
 </div></div>
 
 <script>
@@ -263,111 +266,190 @@ let CFG = null;
 const ALL_TAGS = ["费率账","政策红线","C端自由","判例拆解","招聘成本","业态案例","职伤保障","代扣新政","多雇主生态","系统留痕","门店排班","社保新规","AI用工"];
 
 function setStatus(msg, cls){ const s=document.getElementById("status"); s.textContent=msg; s.className=cls||""; }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }
 
-async function boot(){
-  const r = await fetch("/api/config"); CFG = await r.json();
-  document.getElementById("focusNote").value = CFG.daily_focus.note || "";
-  renderTopics(); renderWeights(); renderChips(); renderGov(); renderWx(); renderKw();
-  document.querySelector(`#sens input[value="${CFG.scan.sensitivity}"]`).checked = true;
-  setStatus("已载入配置（最后更新 " + CFG.updated + "）");
-}
-
+/* ---------- 渲染 ---------- */
 function renderTopics(){
   const box = document.getElementById("topicList"); box.innerHTML = "";
   (CFG.daily_focus.priority_topics||[]).forEach((t,i)=>{
-    const d=document.createElement("div"); d.className="w-row";
-    d.innerHTML = `<input type="text" value="${esc(t)}" oninput="CFG.daily_focus.priority_topics[${i}]=this.value">
-      <button class="del" onclick="CFG.daily_focus.priority_topics.splice(${i},1);renderTopics()">✕</button>`;
-    box.appendChild(d);
+    const d=document.createElement("div"); d.className="row";
+    const inp=document.createElement("input"); inp.type="text"; inp.value=t;
+    inp.dataset.list="topics"; inp.dataset.idx=i;
+    const del=document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕";
+    del.dataset.del="topics"; del.dataset.idx=i;
+    d.appendChild(inp); d.appendChild(del); box.appendChild(d);
   });
 }
-function addTopic(){ const v=document.getElementById("newTopic").value.trim(); if(!v) return;
-  CFG.daily_focus.priority_topics.push(v); document.getElementById("newTopic").value=""; renderTopics(); }
-
 function renderWeights(){
   const box = document.getElementById("weights"); box.innerHTML = "";
   for(const k in CFG.direction_weights){
     const d=document.createElement("div"); d.className="w-row";
-    d.innerHTML = `<label>${k}</label><input type="text" value="${CFG.direction_weights[k]}"
-      oninput="CFG.direction_weights['${k}']=parseInt(this.value)||0;updateBars()">
-      <div class="bar"><i style="width:${CFG.direction_weights[k]}%"></i></div><span class="pct">${CFG.direction_weights[k]}%</span>`;
+    const lab=document.createElement("label"); lab.textContent=k;
+    const inp=document.createElement("input"); inp.type="text"; inp.value=CFG.direction_weights[k];
+    inp.dataset.weight=k;
+    const bar=document.createElement("div"); bar.className="bar";
+    const fill=document.createElement("i"); fill.style.width=Math.min(CFG.direction_weights[k],100)+"%"; bar.appendChild(fill);
+    const pct=document.createElement("span"); pct.textContent=CFG.direction_weights[k]+"%";
+    d.appendChild(lab); d.appendChild(inp); d.appendChild(bar); d.appendChild(pct);
     box.appendChild(d);
   }
   updateBars();
 }
 function updateBars(){
   let sum=0;
-  document.querySelectorAll("#weights .w-row").forEach((row,i)=>{
+  document.querySelectorAll("#weights .w-row").forEach(row=>{
     const v = parseInt(row.querySelector("input").value)||0; sum+=v;
     row.querySelector(".bar i").style.width = Math.min(v,100)+"%";
-    row.querySelector(".pct").textContent = v+"%";
+    row.querySelector("span:last-child").textContent = v+"%";
   });
   const el=document.getElementById("sum");
   el.textContent = "合计 " + sum + "%" + (sum!==100 ? "（建议凑整 100%）" : "");
   el.className = sum===100 ? "" : "bad";
 }
-
 function renderChips(){
   const box=document.getElementById("chips"); box.innerHTML="";
   const all=[...new Set([...ALL_TAGS, ...CFG.focus_tags])];
   all.forEach(t=>{
     const c=document.createElement("span"); c.className="chip"+(CFG.focus_tags.includes(t)?" on":"");
-    c.textContent=t;
-    c.onclick=()=>{ const i=CFG.focus_tags.indexOf(t);
-      i>=0?CFG.focus_tags.splice(i,1):CFG.focus_tags.push(t); renderChips(); };
+    c.textContent=t; c.dataset.tag=t;
     box.appendChild(c);
   });
 }
-function addTag(){ const v=document.getElementById("newTag").value.trim(); if(!v) return;
-  if(!CFG.focus_tags.includes(v)) CFG.focus_tags.push(v);
-  document.getElementById("newTag").value=""; renderChips(); }
-
-function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }
-
-function renderTable(tbodyId, rows, fields){
-  const tb=document.querySelector(tbodyId+" tbody"); tb.innerHTML="";
+function renderTable(tableId, rows, fields){
+  const tb=document.querySelector(tableId+" tbody"); tb.innerHTML="";
   rows.forEach((r,i)=>{
     const tr=document.createElement("tr");
-    tr.innerHTML = fields.map(f=>`<td><input value="${esc(r[f])}" oninput="rowEdit(${tbodyId},${i},'${f}',this.value)"></td>`).join("")
-      + `<td><button class="del" onclick="rowDel(${tbodyId},${i})">✕</button></td>`;
+    fields.forEach(f=>{
+      const td=document.createElement("td");
+      const inp=document.createElement("input"); inp.value=r[f]||"";
+      inp.dataset.field=f; inp.dataset.idx=i; inp.dataset.table=tableId;
+      td.appendChild(inp); tr.appendChild(td);
+    });
+    const td=document.createElement("td");
+    const del=document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕";
+    del.dataset.delRow=tableId; del.dataset.idx=i;
+    td.appendChild(del); tr.appendChild(td);
     tb.appendChild(tr);
   });
 }
 function renderGov(){ renderTable("#govTable", CFG.gov_sites, ["name","url","note"]); }
 function renderWx(){ renderTable("#wxTable", CFG.weixin_accounts, ["name","type","reason"]); }
-function rowEdit(tbody,i,f,v){
-  const rows = tbody==="#govTable"?CFG.gov_sites:CFG.weixin_accounts; rows[i][f]=v; }
-function rowDel(tbody,i){
-  const rows = tbody==="#govTable"?CFG.gov_sites:CFG.weixin_accounts; rows.splice(i,1);
-  tbody==="#govTable"?renderGov():renderWx(); }
-function addRow(kind){
-  if(kind==="gov"){ CFG.gov_sites.push({name:"",url:"",note:""}); renderGov(); }
-  else { CFG.weixin_accounts.push({name:"",type:"",reason:""}); renderWx(); } }
-
 function renderKw(){
   const box=document.getElementById("kwList"); box.innerHTML="";
   CFG.search_keywords.forEach((k,i)=>{
-    const d=document.createElement("div"); d.className="w-row";
-    d.innerHTML=`<input type="text" value="${esc(k)}" oninput="CFG.search_keywords[${i}]=this.value">
-      <button class="del" onclick="CFG.search_keywords.splice(${i},1);renderKw()">✕</button>`;
-    box.appendChild(d);
+    const d=document.createElement("div"); d.className="row";
+    const inp=document.createElement("input"); inp.type="text"; inp.value=k;
+    inp.dataset.list="kw"; inp.dataset.idx=i;
+    const del=document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕";
+    del.dataset.del="kw"; del.dataset.idx=i;
+    d.appendChild(inp); d.appendChild(del); box.appendChild(d);
   });
 }
-function addKw(){ const v=document.getElementById("newKw").value.trim(); if(!v) return;
-  CFG.search_keywords.push(v); document.getElementById("newKw").value=""; renderKw(); }
+
+/* ---------- 事件（全部委托，杜绝行内 JS 出错） ---------- */
+document.addEventListener("input", e=>{
+  const t=e.target;
+  if(t.dataset.weight!==undefined){ updateBars(); return; }
+  if(t.dataset.field){
+    const arr = t.dataset.table==="#govTable" ? CFG.gov_sites : CFG.weixin_accounts;
+    arr[+t.dataset.idx][t.dataset.field]=t.value;
+  }
+  else if(t.dataset.list==="topics"){ CFG.daily_focus.priority_topics[+t.dataset.idx]=t.value; }
+  else if(t.dataset.list==="kw"){ CFG.search_keywords[+t.dataset.idx]=t.value; }
+});
+document.addEventListener("click", e=>{
+  const chip=e.target.closest(".chip");
+  if(chip){ const t=chip.dataset.tag; const i=CFG.focus_tags.indexOf(t);
+    i>=0?CFG.focus_tags.splice(i,1):CFG.focus_tags.push(t); renderChips(); return; }
+
+  const del=e.target.closest("button[data-del]");
+  if(del){
+    if(del.dataset.del==="topics") CFG.daily_focus.priority_topics.splice(+del.dataset.idx,1);
+    if(del.dataset.del==="kw") CFG.search_keywords.splice(+del.dataset.idx,1);
+    if(del.dataset.del==="topics"){ renderTopics(); return; }
+    if(del.dataset.del==="kw"){ renderKw(); return; }
+  }
+  const delRow=e.target.closest("button[data-delRow]");
+  if(delRow){
+    if(delRow.dataset.delRow==="#govTable") CFG.gov_sites.splice(+delRow.dataset.idx,1);
+    else CFG.weixin_accounts.splice(+delRow.dataset.idx,1);
+    delRow.dataset.delRow==="#govTable"?renderGov():renderWx(); return;
+  }
+
+  const add=e.target.closest("button[data-add]");
+  if(add){
+    const kind=add.dataset.add;
+    const map={topic:"newTopic", tag:"newTag", kw:"newKw"};
+    if(kind==="gov"){ CFG.gov_sites.push({name:"",url:"",note:""}); renderGov(); }
+    else if(kind==="wx"){ CFG.weixin_accounts.push({name:"",type:"",reason:""}); renderWx(); }
+    else if(kind==="topic"){ const v=document.getElementById("newTopic").value.trim();
+      if(!v) return; CFG.daily_focus.priority_topics.push(v); document.getElementById("newTopic").value=""; renderTopics(); }
+    else if(kind==="tag"){ const v=document.getElementById("newTag").value.trim();
+      if(!v) return; if(!CFG.focus_tags.includes(v)) CFG.focus_tags.push(v);
+      document.getElementById("newTag").value=""; renderChips(); }
+    else if(kind==="kw"){ const v=document.getElementById("newKw").value.trim();
+      if(!v) return; CFG.search_keywords.push(v); document.getElementById("newKw").value=""; renderKw(); }
+    return;
+  }
+
+  const act=e.target.closest("button[data-act]");
+  if(act){
+    if(act.dataset.act==="reload"){ location.reload(); return; }
+    if(act.dataset.act==="save"){ save(); return; }
+  }
+});
+document.addEventListener("keydown", e=>{
+  if(e.key!=="Enter") return;
+  const id=e.target.id;
+  if(id==="newTopic"){ e.preventDefault(); document.querySelector('button[data-add="topic"]').click(); }
+  if(id==="newTag"){ e.preventDefault(); document.querySelector('button[data-add="tag"]').click(); }
+  if(id==="newKw"){ e.preventDefault(); document.querySelector('button[data-add="kw"]').click(); }
+});
+
+/* ---------- 保存：双保险，直接从页面收集全部数据 ---------- */
+function harvest(){
+  CFG.daily_focus.note = document.getElementById("focusNote").value;
+  const sens=document.querySelector('#sens input:checked'); if(sens) CFG.scan.sensitivity=sens.value;
+  CFG.gov_sites = [];
+  document.querySelectorAll("#govTable tbody tr").forEach(tr=>{
+    const r={};
+    tr.querySelectorAll("input[data-field]").forEach(inp=>r[inp.dataset.field]=inp.value);
+    CFG.gov_sites.push(r);
+  });
+  CFG.weixin_accounts = [];
+  document.querySelectorAll("#wxTable tbody tr").forEach(tr=>{
+    const r={};
+    tr.querySelectorAll("input[data-field]").forEach(inp=>r[inp.dataset.field]=inp.value);
+    CFG.weixin_accounts.push(r);
+  });
+  CFG.gov_sites = CFG.gov_sites.filter(r=>r.name && r.name.trim());
+  CFG.weixin_accounts = CFG.weixin_accounts.filter(r=>r.name && r.name.trim());
+  const topics=[]; document.querySelectorAll("#topicList input").forEach(i=>{ if(i.value.trim()) topics.push(i.value); });
+  CFG.daily_focus.priority_topics=topics;
+  const kws=[]; document.querySelectorAll("#kwList input").forEach(i=>{ if(i.value.trim()) kws.push(i.value); });
+  CFG.search_keywords=kws;
+  const w={}; document.querySelectorAll("#weights .w-row input").forEach(inp=>{ w[inp.dataset.weight]=parseInt(inp.value)||0; });
+  CFG.direction_weights=w;
+}
+
+async function boot(){
+  const r = await fetch("/api/config"); CFG = await r.json();
+  document.getElementById("focusNote").value = CFG.daily_focus.note || "";
+  renderTopics(); renderWeights(); renderChips(); renderGov(); renderWx(); renderKw();
+  const sens=document.querySelector(`#sens input[value="${CFG.scan.sensitivity}"]`);
+  if(sens) sens.checked = true;
+  setStatus("已载入配置（最后更新 " + CFG.updated + "）");
+}
 
 async function save(){
   const btn=document.getElementById("saveBtn"); btn.disabled=true;
   setStatus("正在保存并推送到 GitHub…");
-  CFG.daily_focus.note = document.getElementById("focusNote").value;
-  CFG.scan.sensitivity = document.querySelector('#sens input:checked').value;
-  CFG.gov_sites = CFG.gov_sites.filter(r=>r.name&&r.url);
-  CFG.weixin_accounts = CFG.weixin_accounts.filter(r=>r.name);
-  CFG.search_keywords = CFG.search_keywords.filter(k=>k.trim());
+  harvest();
   try{
     const r = await fetch("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(CFG)});
     const j = await r.json();
     setStatus(j.message, r.ok?"ok":"err");
+    renderGov(); renderWx(); renderTopics(); renderKw();
   }catch(e){ setStatus("保存失败："+e, "err"); }
   btn.disabled=false;
 }
@@ -405,12 +487,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length", 0))
         try:
-            cfg = json.loads(self.rfile.read(length).decode("utf-8"))
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+            push = body.pop("push", True)
+            cfg = body
             for key in ("daily_focus", "direction_weights", "focus_tags", "scan",
                         "gov_sites", "weixin_accounts", "search_keywords"):
                 assert key in cfg
-            msg = save_config(cfg)
-            self._send(200, json.dumps({"message": "✔ 保存成功\n" + msg}, ensure_ascii=False))
+            msg = save_config(cfg, push=bool(push))
+            self._send(200, json.dumps({"message": ("✔ 保存成功\n" if push else "✔ 已保存（未推送）\n") + msg}, ensure_ascii=False))
         except Exception as e:
             self._send(500, json.dumps({"message": f"保存失败：{e}"}, ensure_ascii=False))
 
