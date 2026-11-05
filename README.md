@@ -37,6 +37,12 @@ ip-workbench/
 - "把这条选题写成小红书图文 / 视频号口播稿" —— 落到 `content/drafts/`
 - "记录发布：小红书发了《xxx》" —— 归档到 `content/published/`
 
+**方式 C（配置界面）**：修改雷达信源与每日内容方向用图形界面——
+```bash
+python tools/radar_config_app.py   # 然后打开 http://127.0.0.1:8788
+```
+保存即写入 `radar/radar-config.json`（唯一配置事实来源）并自动提交推送 GitHub，次日 07:30 雷达按新方向扫描。任何一台电脑 clone 仓库后都能同样启动。
+
 **方式 B（本地 git 镜像）**：
 ```bash
 git clone https://github.com/jinzhongkan/ip-workbench.git
@@ -46,6 +52,7 @@ git clone https://github.com/jinzhongkan/ip-workbench.git
 
 ## 每日流程（建议）
 
+0. **早（可选 10 秒）**：打开配置台（`python tools/radar_config_app.py`）改一句"今日焦点"，雷达当天按此调整选题方向。
 1. **早**：雷达扫描（自动/手动）→ 读日报，标记可写的选题
 2. **碎片时间**：现场素材随手丢进 `content/素材口袋.md`
 3. **晚**：从选题库取 1 条写成草稿 → 按日历排期发布 → 发布后归档记录
